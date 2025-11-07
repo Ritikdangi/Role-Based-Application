@@ -87,7 +87,8 @@ router.get('/users', authenticate, requireRole('superadmin'), async (req, res) =
 // Admin: list users in the admin's institution
 router.get('/institution/users', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const instId = req.user.institution
+    // normalize institution id whether populated or not
+    const instId = req.user.institution && req.user.institution._id ? req.user.institution._id : req.user.institution
     if (!instId) return res.status(400).json({ message: 'Admin has no institution assigned' })
     const users = await User.find({ institution: instId }).select('-password')
     res.json({ users })
@@ -100,9 +101,10 @@ router.get('/institution/users', authenticate, requireRole('admin'), async (req,
 // Admin: list pending join requests for this institution
 router.get('/requests', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const instId = req.user.institution
-    if (!instId) return res.status(400).json({ message: 'Admin has no institution assigned' })
-    const requests = await JoinRequest.find({ institution: instId, status: 'pending' }).populate('user', 'name email username')
+  // normalize institution id whether populated or not
+  const instId = req.user.institution && req.user.institution._id ? req.user.institution._id : req.user.institution
+  if (!instId) return res.status(400).json({ message: 'Admin has no institution assigned' })
+  const requests = await JoinRequest.find({ institution: instId, status: 'pending' }).populate('user', 'name email username')
     res.json({ requests })
   } catch (err) {
     console.error(err)
@@ -113,12 +115,12 @@ router.get('/requests', authenticate, requireRole('admin'), async (req, res) => 
 // Admin approve a request
 router.post('/requests/:id/approve', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const jr = await JoinRequest.findById(req.params.id).populate('institution')
-    if (!jr) return res.status(404).json({ message: 'Request not found' })
-    // compare institution ids robustly whether populated or not
-    const jrInstId = jr.institution && jr.institution._id ? jr.institution._id.toString() : jr.institution.toString()
-    const adminInstId = req.user.institution ? req.user.institution.toString() : null
-    if (!adminInstId || jrInstId !== adminInstId) return res.status(403).json({ message: 'Not allowed' })
+  const jr = await JoinRequest.findById(req.params.id).populate('institution')
+  if (!jr) return res.status(404).json({ message: 'Request not found' })
+  // compare institution ids robustly whether populated or not
+  const jrInstId = jr.institution && jr.institution._id ? jr.institution._id.toString() : jr.institution.toString()
+  const adminInstId = req.user.institution && req.user.institution._id ? req.user.institution._id.toString() : (req.user.institution ? req.user.institution.toString() : null)
+  if (!adminInstId || jrInstId !== adminInstId) return res.status(403).json({ message: 'Not allowed' })
 
     jr.status = 'approved'
     jr.reviewedBy = req.user._id
@@ -141,11 +143,11 @@ router.post('/requests/:id/approve', authenticate, requireRole('admin'), async (
 // Admin reject a request
 router.post('/requests/:id/reject', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const jr = await JoinRequest.findById(req.params.id).populate('institution')
-    if (!jr) return res.status(404).json({ message: 'Request not found' })
-    const jrInstId = jr.institution && jr.institution._id ? jr.institution._id.toString() : jr.institution.toString()
-    const adminInstId = req.user.institution ? req.user.institution.toString() : null
-    if (!adminInstId || jrInstId !== adminInstId) return res.status(403).json({ message: 'Not allowed' })
+  const jr = await JoinRequest.findById(req.params.id).populate('institution')
+  if (!jr) return res.status(404).json({ message: 'Request not found' })
+  const jrInstId = jr.institution && jr.institution._id ? jr.institution._id.toString() : jr.institution.toString()
+  const adminInstId = req.user.institution && req.user.institution._id ? req.user.institution._id.toString() : (req.user.institution ? req.user.institution.toString() : null)
+  if (!adminInstId || jrInstId !== adminInstId) return res.status(403).json({ message: 'Not allowed' })
 
     jr.status = 'rejected'
     jr.reviewedBy = req.user._id

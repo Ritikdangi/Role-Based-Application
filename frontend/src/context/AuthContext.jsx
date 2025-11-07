@@ -16,17 +16,23 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => {
     return localStorage.getItem('token') || null
   })
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    } else {
-      delete api.defaults.headers.common['Authorization']
+    let mounted = true
+    const init = async () => {
+      if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        // refresh current user data
+        await fetchMe()
+      } else {
+        delete api.defaults.headers.common['Authorization']
+        setUser(null)
+      }
+      if (mounted) setReady(true)
     }
-    // if we have a token, refresh current user data
-    if (token) {
-      fetchMe()
-    }
+    init()
+    return () => { mounted = false }
   }, [token])
 
   const fetchMe = async () => {
@@ -67,7 +73,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, fetchMe }}>
+    <AuthContext.Provider value={{ user, token, ready, login, logout, fetchMe }}>
       {children}
     </AuthContext.Provider>
   )

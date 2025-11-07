@@ -6,7 +6,7 @@ import api from '../services/api'
 import Layout from '../components/Layout'
 
 const DashboardAdmin = () => {
-  const { user, logout } = useAuth()
+  const { user, token, ready, logout } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [requests, setRequests] = useState([])
@@ -37,9 +37,15 @@ const DashboardAdmin = () => {
   }
 
   useEffect(() => {
-    fetchUsers()
-    fetchRequests()
-  }, [])
+    // Only fetch when the authenticated user is available, is an admin,
+    // and we have a token available (prevents race where user is read
+    // from localStorage but axios auth header hasn't been applied yet).
+    if (ready && user && token && user.role === 'admin') {
+      fetchUsers()
+      fetchRequests()
+    }
+    // Re-run when user or token changes
+  }, [user, token])
 
   return (
     <Layout role={user?.role}>
@@ -77,8 +83,25 @@ const DashboardAdmin = () => {
                     <div className="text-sm text-gray-700 mt-2">Enrollment: {r.details.enrollmentYear} | Branch: {r.details.branch}</div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button onClick={async () => { await api.post(`/api/admins/requests/${r._id}/approve`); await fetchRequests(); await fetchUsers(); }} className="px-3 py-1 bg-green-600 text-white rounded">Approve</button>
-                    <button onClick={async () => { await api.post(`/api/admins/requests/${r._id}/reject`); await fetchRequests(); }} className="px-3 py-1 bg-red-500 text-white rounded">Reject</button>
+                    <button onClick={async () => {
+                      try {
+                        await api.post(`/api/admins/requests/${r._id}/approve`)
+                        await fetchRequests()
+                        await fetchUsers()
+                      } catch (err) {
+                        console.error('Approve error', err)
+                        alert(err.response?.data?.message || 'Failed to approve')
+                      }
+                    }} className="px-3 py-1 bg-green-600 text-white rounded">Approve</button>
+                    <button onClick={async () => {
+                      try {
+                        await api.post(`/api/admins/requests/${r._id}/reject`)
+                        await fetchRequests()
+                      } catch (err) {
+                        console.error('Reject error', err)
+                        alert(err.response?.data?.message || 'Failed to reject')
+                      }
+                    }} className="px-3 py-1 bg-red-500 text-white rounded">Reject</button>
                   </div>
                 </li>
               ))}
