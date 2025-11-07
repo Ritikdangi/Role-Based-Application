@@ -46,6 +46,11 @@ export const AuthProvider = ({ children }) => {
   }
 
   const login = ({ user, token }) => {
+    // Set axios auth header synchronously to avoid race where other
+    // components fire protected requests before the effect runs.
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
     setUser(user)
     setToken(token)
     localStorage.setItem('token', token)
@@ -56,6 +61,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null)
     setToken(null)
+    delete api.defaults.headers.common['Authorization']
     localStorage.removeItem('token')
     localStorage.removeItem('auth')
   }
