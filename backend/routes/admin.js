@@ -4,6 +4,8 @@ import User from '../models/User.js';
 import Institution from '../models/Institution.js';
 import JoinRequest from '../models/JoinRequest.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { requireAdminRole } from '../middleware/hierarchy.js';
+import linksController from '../controllers/links.controller.js';
 
 const router = express.Router();
 
@@ -85,7 +87,7 @@ router.get('/users', authenticate, requireRole('superadmin'), async (req, res) =
 });
 
 // Admin: list users in the admin's institution
-router.get('/institution/users', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/institution/users', authenticate, requireAdminRole, async (req, res) => {
   try {
     // normalize institution id whether populated or not
     const instId = req.user.institution && req.user.institution._id ? req.user.institution._id : req.user.institution
@@ -99,7 +101,7 @@ router.get('/institution/users', authenticate, requireRole('admin'), async (req,
 })
 
 // Admin: list pending join requests for this institution
-router.get('/requests', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/requests', authenticate, requireAdminRole, async (req, res) => {
   try {
   // normalize institution id whether populated or not
   const instId = req.user.institution && req.user.institution._id ? req.user.institution._id : req.user.institution
@@ -112,8 +114,21 @@ router.get('/requests', authenticate, requireRole('admin'), async (req, res) => 
   }
 })
 
+// Admin/Sub-admin: list rejected join requests for this institution
+router.get('/rejected', authenticate, requireAdminRole, async (req, res) => {
+  try {
+    const instId = req.user.institution && req.user.institution._id ? req.user.institution._id : req.user.institution
+    if (!instId) return res.status(400).json({ message: 'Admin has no institution assigned' })
+    const requests = await JoinRequest.find({ institution: instId, status: 'rejected' }).populate('user', 'name email username')
+    res.json({ requests })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
 // Admin approve a request
-router.post('/requests/:id/approve', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/requests/:id/approve', authenticate, requireAdminRole, async (req, res) => {
   try {
   const jr = await JoinRequest.findById(req.params.id).populate('institution')
   if (!jr) return res.status(404).json({ message: 'Request not found' })
@@ -141,7 +156,7 @@ router.post('/requests/:id/approve', authenticate, requireRole('admin'), async (
 })
 
 // Admin reject a request
-router.post('/requests/:id/reject', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/requests/:id/reject', authenticate, requireAdminRole, async (req, res) => {
   try {
   const jr = await JoinRequest.findById(req.params.id).populate('institution')
   if (!jr) return res.status(404).json({ message: 'Request not found' })
@@ -161,5 +176,40 @@ router.post('/requests/:id/reject', authenticate, requireRole('admin'), async (r
   }
 })
 
+
+
+// Admin/Sub-admin: set a user's adminHierarchy directly (role-based)
+router.put('/users/:id/hierarchy', authenticate, requireAdminRole, async (req, res) => {
+  try {
+    const targetId = req.params.id
+    const { adminHierarchy } = req.body
+    if (!adminHierarchy) return res.status(400).json({ message: 'adminHierarchy required' })
+
+    const actor = req.user
+    // allow superadmin and college-level admin to set directly
+    if (actor.role === 'superadmin' || actor.role === 'admin') {
+      await User.findByIdAndUpdate(targetId, {
+        $set: { adminHierarchy },
+        $push: { adminHierarchyHistory: { level: adminHierarchy, grantedBy: actor._id, grantedAt: new Date() } }
+      }).exec()
+      return res.json({ message: 'adminHierarchy updated' })
+    }
+
+    // for sub-admins, verify they are allowed to grant this level
+    if (!linksController.canGrantHierarchy(actor.adminHierarchy, adminHierarchy)) {
+      return res.status(403).json({ message: 'Not authorized to grant this hierarchy' })
+    }
+
+    await User.findByIdAndUpdate(targetId, {
+      $set: { adminHierarchy },
+      $push: { adminHierarchyHistory: { level: adminHierarchy, grantedBy: actor._id, grantedAt: new Date() } }
+    }).exec()
+    return res.json({ message: 'adminHierarchy updated' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
 export default router;
+
 

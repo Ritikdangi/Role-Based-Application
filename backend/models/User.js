@@ -104,6 +104,21 @@ const userSchema = new mongoose.Schema(
         return false;
       },
     },
+    // Admin hierarchy string (e.g. 'hod', 'faculty', 'institute_management').
+    // This represents the stored hierarchy for server-side checks. It may be
+    // updated when a LinkRequest (promotion) is approved.
+    adminHierarchy: {
+      type: String,
+      default: undefined,
+    },
+    // Optional history of granted hierarchies for audit
+    adminHierarchyHistory: [
+      {
+        level: String,
+        grantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        grantedAt: Date,
+      },
+    ],
     activityHistory: [
       {
         date: {

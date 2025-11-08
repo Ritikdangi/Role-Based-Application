@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext'
 const Header = () => {
   const { user, logout } = useAuth()
   return (
-    <header className="w-full bg-white border-b shadow-sm">
-  <div className="px-6 py-3 flex items-center justify-between" style={{ paddingLeft: '16rem' }}>
+    <header className="w-full bg-white border-b shadow-sm fixed top-0 left-0 z-40 h-16">
+      <div className="px-6 h-full flex items-center justify-between pl-64">
         <div />
 
         <div className="flex items-center gap-4">

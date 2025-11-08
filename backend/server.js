@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import institutionsRouter from './routes/institutions.js';
+import linksRouter from './routes/links.js';
 
 const app = express();
 app.use(cors());
@@ -28,6 +29,7 @@ app.get('/api/ping', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/admins', adminRouter);
 app.use('/api/institutions', institutionsRouter);
+app.use('/api/links', linksRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

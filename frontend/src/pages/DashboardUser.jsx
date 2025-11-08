@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 
 import { useEffect, useState } from 'react'
 import api from '../services/api'
-import Layout from '../components/Layout'
+
 
 const DashboardUser = () => {
   const { user, logout, fetchMe } = useAuth()
@@ -78,6 +78,13 @@ const DashboardUser = () => {
     return () => { if (poll) clearInterval(poll) }
   }, [fetchMe])
 
+  // close modal on Escape
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setShowRequestForm(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   const openRequestFormForSelected = () => {
     if (!selectedInstitution) {
       setJoinMsg('Please choose an institution first')
@@ -105,8 +112,7 @@ const DashboardUser = () => {
     }
   }
   return (
-    <Layout role={user?.role}>
-      <div className="p-6">
+    <div className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900">Welcome to CareerNest</h1>
@@ -118,7 +124,7 @@ const DashboardUser = () => {
           <div className="col-span-2">
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-semibold mb-2">Your Network</h2>
-              <p className="text-sm text-gray-600 mb-3">Quick overview of your membership status.</p>
+              <p className="text-sm text-gray-600 mb-3">Quick overview of your membership status and join requests.</p>
               {user?.institution ? (
                 <div className="mt-2 p-4 border rounded bg-orange-50">
                   <div className="text-lg font-medium">{user.institution.name}</div>
@@ -128,52 +134,62 @@ const DashboardUser = () => {
                 <div className="text-sm text-gray-600">You are not a member of any network yet.</div>
               )}
               {joinMsg && <div className="mt-3 text-green-600">{joinMsg}</div>}
-            </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md mt-6">
-              <h2 className="text-xl font-semibold mb-2">Your Requests</h2>
-              <p className="text-sm text-gray-600 mb-3">Track the status of your join requests.</p>
-              {/* Optionally list requests here by calling /api/institutions/requests if desired */}
+              {/* Inline: Request to Join form and status live inside the Network panel */}
+              <div className="mt-6 border-t pt-4">
+                <h3 className="font-semibold mb-2">Request to Join a Network</h3>
+                {loading && <div>Loading networks...</div>}
+                {!loading && institutions.length === 0 && <div>No networks found</div>}
+
+                <label className="block text-sm font-medium">Choose institution</label>
+                <select value={selectedInstitution} onChange={e => setSelectedInstitution(e.target.value)} className="w-full p-2 border rounded mt-2">
+                  <option value="">-- Select an institution --</option>
+                  {institutions.map(inst => (
+                    <option key={inst._id} value={inst._id}>{inst.name} ({inst.type})</option>
+                  ))}
+                </select>
+
+                <div className="mt-3">
+                  <button onClick={openRequestFormForSelected} className="w-full px-3 py-2 bg-orange-600 text-white rounded">Fill request details</button>
+                </div>
+
+                {showRequestForm && (
+                  // Modal overlay
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowRequestForm(false) }}
+                  >
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-xl p-6 mx-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-start justify-between">
+                        <h3 className="text-lg font-semibold">Fill request details</h3>
+                        <button aria-label="Close" className="text-gray-500 hover:text-gray-700" onClick={() => setShowRequestForm(false)}>✕</button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2">Provide your enrollment details to request membership for the selected institution.</p>
+                      <form onSubmit={submitRequest} className="mt-4 space-y-3">
+                        <input className="w-full p-3 border rounded" placeholder="Enrollment year" value={requestData.enrollmentYear} onChange={e => setRequestData({ ...requestData, enrollmentYear: e.target.value })} />
+                        <input className="w-full p-3 border rounded" placeholder="Branch" value={requestData.branch} onChange={e => setRequestData({ ...requestData, branch: e.target.value })} />
+                        <input className="w-full p-3 border rounded" placeholder="Roll number" value={requestData.rollNumber} onChange={e => setRequestData({ ...requestData, rollNumber: e.target.value })} />
+                        <input className="w-full p-3 border rounded" placeholder="Course" value={requestData.course} onChange={e => setRequestData({ ...requestData, course: e.target.value })} />
+                        <input className="w-full p-3 border rounded" placeholder="College email" value={requestData.collegeEmail} onChange={e => setRequestData({ ...requestData, collegeEmail: e.target.value })} />
+
+                        <div className="flex gap-3 mt-2">
+                          <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Send Request</button>
+                          <button type="button" onClick={() => setShowRequestForm(false)} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <aside>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="font-semibold mb-2">Request to Join a Network</h3>
-              {loading && <div>Loading networks...</div>}
-              {!loading && institutions.length === 0 && <div>No networks found</div>}
-
-              <label className="block text-sm font-medium">Choose institution</label>
-              <select value={selectedInstitution} onChange={e => setSelectedInstitution(e.target.value)} className="w-full p-2 border rounded mt-2">
-                <option value="">-- Select an institution --</option>
-                {institutions.map(inst => (
-                  <option key={inst._id} value={inst._id}>{inst.name} ({inst.type})</option>
-                ))}
-              </select>
-
-              <div className="mt-3">
-                <button onClick={openRequestFormForSelected} className="w-full px-3 py-2 bg-orange-600 text-white rounded">Fill request details</button>
-              </div>
-
-              {showRequestForm && (
-                <form onSubmit={submitRequest} className="mt-3 space-y-2">
-                  <input className="w-full p-2 border rounded" placeholder="Enrollment year" value={requestData.enrollmentYear} onChange={e => setRequestData({ ...requestData, enrollmentYear: e.target.value })} />
-                  <input className="w-full p-2 border rounded" placeholder="Branch" value={requestData.branch} onChange={e => setRequestData({ ...requestData, branch: e.target.value })} />
-                  <input className="w-full p-2 border rounded" placeholder="Roll number" value={requestData.rollNumber} onChange={e => setRequestData({ ...requestData, rollNumber: e.target.value })} />
-                  <input className="w-full p-2 border rounded" placeholder="Course" value={requestData.course} onChange={e => setRequestData({ ...requestData, course: e.target.value })} />
-                  <input className="w-full p-2 border rounded" placeholder="College email (optional)" value={requestData.collegeEmail} onChange={e => setRequestData({ ...requestData, collegeEmail: e.target.value })} />
-
-                  <div className="flex gap-2 mt-2">
-                    <button type="submit" className="flex-1 px-3 py-2 bg-green-600 text-white rounded">Send Request</button>
-                    <button type="button" onClick={() => setShowRequestForm(false)} className="flex-1 px-3 py-2 bg-gray-200 rounded">Cancel</button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </aside>
+          {/* Right column intentionally left empty to keep layout spacing similar to previous design */}
+          <aside />
         </div>
       </div>
-    </Layout>
   )
 }
 

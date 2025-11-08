@@ -24,16 +24,21 @@ const Login = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
 
+  const { fetchMe } = useAuth()
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     try {
       const res = await api.post('/api/auth/login', { emailOrUsername, password })
       login({ user: res.data.user, token: res.data.token })
-      const role = res.data.user.role
-      if (role === 'superadmin') navigate('/superadmin/dashboard')
-      else if (role === 'admin') navigate('/admin/dashboard')
-      else navigate('/user/dashboard')
+      // Refresh authoritative user record from server (ensures adminHierarchy is present)
+      const me = await fetchMe()
+      const destUser = me || res.data.user
+      if (destUser.role === 'superadmin') navigate('/superadmin/dashboard', { replace: true })
+      else if (destUser.adminHierarchy) navigate('/subadmin/dashboard', { replace: true })
+      else if (destUser.role === 'admin') navigate('/admin/dashboard', { replace: true })
+      else navigate('/user/dashboard', { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed')
     }
