@@ -9,8 +9,9 @@ import linksRouter from './routes/links.js';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
 
+app.use(express.json());
+// changes 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/roleBasedDB';
 const PORT = process.env.PORT || 5000;
 
